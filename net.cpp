@@ -104,7 +104,7 @@ void net::learn(ifstream &trainDataFile, int numEpochs, double learningRate) {
                     // Compute the Error at this Output Node
                         error = dsig(outNode->getInJ()) * (outputs[on]-(outNode->getOutput()));
                         outNode->setError(error);
-                        cout << "O Error: "<<error<<endl;
+//                        cout << "O Error: "<<error<<endl;
 
                     // Update Weights coming into this node. Remember to update bias weight TOO.
                         // Bias Update
@@ -134,7 +134,7 @@ void net::learn(ifstream &trainDataFile, int numEpochs, double learningRate) {
                             error += (nextNode->getWeight(n))*(nextNode->getError());
                         }
                         error *= dsig(node->getInJ());
-                        cout << "In Error: "<<error<<endl;
+//                        cout << "In Error: "<<error<<endl;
                         node->setError(error);
 
                     // Update Weights coming into this node. Remember to update bias weight TOO.
@@ -177,4 +177,110 @@ void net::saveNetwork(ofstream &saveFile) {
             auto oNode = layer->getNeuron(on);
             saveFile << oNode->getAllWeightsInString() << endl;
         }
+}
+
+void net::test(ifstream &testDataFile, ofstream &saveFile) {
+    // Don't need to check that data has dimensionality of network.
+    int numTest, numI, numO;
+    string line1;
+    getline(testDataFile, line1);
+//        cout << "The first line: " << line1 << endl;
+    stringstream ss(line1);
+    ss >> numTest;
+    ss >> numI;
+    ss >> numO;
+
+    net::metrics met(numO);
+
+    // Iterate through each test example
+    string line;
+    for(int numT = 0; numT < numTest; numT++) {
+
+        // Read in input and output data for a single training example
+            vector<double> inputs;
+            vector<double> expectOutputs;
+
+            getline(testDataFile, line);
+            stringstream ssT(line);
+            double value;
+            for(int in = 0; in < numI; in++) {
+                ssT >> value;
+                inputs.push_back(value);
+            }
+            for(int out = 0; out < numO; out++) {
+                ssT >> value;
+                expectOutputs.push_back(value);
+            }
+
+        /// Propagate inputs to outputs
+        // Set inputs/Set inputs to output OR activation of input layer
+            auto inputLayer = this->getLayer(0);
+            for(int i = 0; i < numI; i++) {
+                auto in = inputLayer->getNeuron(i);
+                in->setOutput(inputs[i]);
+            }
+        // Set Activations OR Outputs of Other Layers (l from 1 to L=3) [Index 1 is the 2nd layer/1st Hidden Layer]
+        for(int l = 1; l < 3; l++) {
+            auto layer = this->getLayer(l);
+            auto prevLayer = this->getLayer(l-1);
+            for(int i = 0; i < layer->getNumNeurons(); i++) { // Each NODE in Layer
+                auto node = layer->getNeuron(i);
+                double inJ = 0;
+                inJ = -1*(node->getBiasWeight()); // Add Fixed Input
+
+                for(int h = 0; h < prevLayer->getNumNeurons(); h++) { // Add Inputs from EACH Prev Layer Node
+                    inJ += (node->getWeight(h))*(prevLayer->getNeuron(h)->getOutput());
+                }
+                node->setInJ(inJ);
+
+                double a = sig(inJ);
+                node->setOutput(a);
+            }
+        }
+
+        // Get Predicted Outputs
+        vector<double> outputs;
+
+        auto outLayer = this->getLayer(2);
+        for(int on = 0; on < outLayer->getNumNeurons(); on++) {
+            auto outNode = outLayer->getNeuron(on);
+            double value = outNode->getOutput();
+
+            if(value >= .5) outputs.push_back(1);
+            else outputs.push_back(0);
+        }
+
+        // Compare and Mark Metrics
+        for(int j = 0; j < numO; j++) {
+            if(outputs[j] == 1) {
+                if(expectOutputs[j] == 1) { // Case A
+                    (met.tables[j]->A)++;
+                }
+                else { // Case B
+                    (met.tables[j]->B)++;
+                }
+            }
+            else {
+                if(expectOutputs[j] == 1) { // Case C
+                    (met.tables[j]->C)++;
+                }
+                else { // Case D
+                    (met.tables[j]->D)++;
+                }
+            }
+        }
+
+        // Test Example Done. Clear the in/out vectors for next example & free up memory.
+        inputs.clear();
+        expectOutputs.clear();
+        outputs.clear();
+
+    }
+
+    // Get other metrics: Overall accuracy (OA), Precision (P), Recall (R), and F1
+    met.getAllOtherMetricsForeachTable();
+    met.getOverallMetrics();
+
+    // Output Results to File
+    met.save(saveFile);
 }
