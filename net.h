@@ -8,6 +8,9 @@
 #define NEURALNET_NET_H
 
 #include <vector>
+#include <string>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -26,23 +29,46 @@ public:
             void setBiasWeight(double value) {
                 this->biasW = value;
             }
+            double getBiasWeight() {
+                return this->biasW;
+            }
             void addInWeight(double inW) {
                 this->inWeights.push_back(inW);
             }
-            double getBiasWeight() {
-                return this->biasW;
+            void setInWeight(double value, int weightPos) {
+                this->inWeights[weightPos] = value;
             }
             double getWeight(int pos) {
                 return this->inWeights[pos];
             }
+            string getAllWeightsInString() {
+                stringstream ss;
+                ss << std::setprecision(3) << std::fixed << this->getBiasWeight();
+//                string output ( to_string(this->getBiasWeight()) );
+                for(std::vector<double>::iterator it = this->inWeights.begin(); it != this->inWeights.end(); ++it) {
+//                    output += " " + to_string(*it);
+                    ss << std::setprecision(3) << std::fixed << " " << *it;
+                }
+//                return output;
+                return ss.str();
+            }
             void setInJ(double value) {
                 this->inJ = value;
+            }
+            double getInJ() {
+                return this->inJ;
             }
             void setOutput(double output) {
                 this->output = output;
             }
             double getOutput() {
                 return this->output;
+            }
+            void setError(double value) {
+                this->error = value;
+            }
+            double getError() {
+                return this->error;
             }
 
         private:
@@ -52,6 +78,7 @@ public:
             double inJ; // The sum of the linear combination of inputs
             double output; // The activation
             vector<double> inWeights; // Order follows order of nodes in prev layer
+            double error;
 
     };
 

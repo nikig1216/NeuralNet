@@ -169,6 +169,7 @@ void startTrain() {
     }
 
     /// TRAINING
+        cout<<"Beginning Training"<<endl;
         ifstream trainFileStream;
         trainFileStream.open(trainFile.c_str());
 
@@ -182,14 +183,18 @@ void startTrain() {
         }
 
     /// OUTPUT/SAVE Trained Network
-//        ofstream saveFileStream;
-//        saveFileStream.open(outFile.c_str());
-//
-//        Network.saveNetwork(saveFileStream);
+        cout << "Done. Saving trained network..."<<endl;
+        ofstream saveFileStream;
+        saveFileStream.open(outFile.c_str());
+
+        Network.saveNetwork(saveFileStream);
+        saveFileStream.close();
 
     return;
 }
 
 void startTest() {
+    string inFile, testFile, outFile;
+
     return;
 }
