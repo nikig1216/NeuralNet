@@ -46,26 +46,40 @@ void net::learn(ifstream &trainDataFile, int numEpochs, double learningRate) {
     ss >> numI;
     ss >> numO;
 
+    // Store training data to iterate through for each epoch
+    vector<tuple<vector<double>,vector<double>>> data; // Vector of input/output pairs
+
+    string line;
+    for(int numTr = 0; numTr < numTrain; numTr++) {
+        // Read in input and output data for a single training example
+        vector<double> inputs;
+        vector<double> outputs;
+
+        getline(trainDataFile, line);
+        stringstream ssTr(line);
+        double value;
+        for(int in = 0; in < numI; in++) {
+            ssTr >> value;
+            inputs.push_back(value);
+        }
+        for(int out = 0; out < numO; out++) {
+            ssTr >> value;
+            outputs.push_back(value);
+        }
+        auto pair = make_tuple(inputs,outputs);
+        data.push_back(pair);
+
+        inputs.clear();
+        outputs.clear();
+    }
+
     // Iterate through all training data (numEpochs) times.
     for(int numE = 0; numE < numEpochs; numE++) {
         // Iterate through each training example
-        string line;
         for(int numTr = 0; numTr < numTrain; numTr++) {
             // Read in input and output data for a single training example
-            vector<double> inputs;
-            vector<double> outputs;
-
-            getline(trainDataFile, line);
-            stringstream ssTr(line);
-            double value;
-            for(int in = 0; in < numI; in++) {
-                ssTr >> value;
-                inputs.push_back(value);
-            }
-            for(int out = 0; out < numO; out++) {
-                ssTr >> value;
-                outputs.push_back(value);
-            }
+            vector<double> inputs = std::get<0>(data[numTr]);
+            vector<double> outputs = std::get<1>(data[numTr]);
 
             /// Propagate inputs to outputs
             // Set inputs/Set inputs to output OR activation of input layer
@@ -81,7 +95,7 @@ void net::learn(ifstream &trainDataFile, int numEpochs, double learningRate) {
                     for(int i = 0; i < layer->getNumNeurons(); i++) { // Each NODE in Layer
                         auto node = layer->getNeuron(i);
                         double inJ = 0;
-                        inJ = -1*(node->getBiasWeight()); // Add Fixed Input
+                        inJ = -1.000*(node->getBiasWeight()); // Add Fixed Input
 
                         for(int h = 0; h < prevLayer->getNumNeurons(); h++) { // Add Inputs from EACH Prev Layer Node
                             inJ += (node->getWeight(h))*(prevLayer->getNeuron(h)->getOutput());
@@ -95,67 +109,78 @@ void net::learn(ifstream &trainDataFile, int numEpochs, double learningRate) {
 
             /// Back-Propagate
             // OUTPUT Layer
-                auto outputLayer = this->getLayer(2);
-                auto prevLayer = this->getLayer(1);
-                double error;
-                for(int on = 0; on < outputLayer->getNumNeurons(); on++) { // Each Output Node
-                    auto outNode = outputLayer->getNeuron(on);
+            auto outputLayer = this->getLayer(2);
+//            auto prevLayer = this->getLayer(1);
+            double error;
+            for(int on = 0; on < outputLayer->getNumNeurons(); on++) { // Each Output Node
+                auto outNode = outputLayer->getNeuron(on);
 
-                    // Compute the Error at this Output Node
-                        error = dsig(outNode->getInJ()) * (outputs[on]-(outNode->getOutput()));
-                        outNode->setError(error);
-//                        cout << "O Error: "<<error<<endl;
+                // Compute the Error at this Output Node
+                error = dsig(outNode->getInJ()) * (outputs[on]-(outNode->getOutput()));
+                outNode->setError(error);
+            }
 
-                    // Update Weights coming into this node. Remember to update bias weight TOO.
-                        // Bias Update
-                        double newBiasW = outNode->getBiasWeight() + (learningRate*(-1)*error);
-                        outNode->setBiasWeight(newBiasW);
-                        // Update InWeights from Nodes (Prev Layer) -> This NODE
-                        double newW;
-                        for(int prevN = 0; prevN < prevLayer->getNumNeurons(); prevN++) {
-                            auto prevNode = prevLayer->getNeuron(prevN);
-                            newW = outNode->getWeight(prevN) + (learningRate*(prevNode->getOutput())*error);
-                            outNode->setInWeight(newW,prevN);
-                        }
-                }
             // Other Layers (From l = L-1 to layer[1] (1st hidden layer)) [Don't need to compute error/weights for input layer]
             for(int l = 1; l > 0; l--) {
                 auto layer = this->getLayer(l);
-                auto prevLayer = this->getLayer(l-1);
+//                prevLayer = this->getLayer(l-1);
                 auto nextLayer = this->getLayer(l+1);
                 double error;
                 for(int n = 0; n < layer->getNumNeurons(); n++) { // Each node in Layer
                     auto node = layer->getNeuron(n);
                     error = 0;
                     // Compute the Error at this Node
-                        for(int nextN = 0; nextN < nextLayer->getNumNeurons(); nextN++) { // Each node in NEXT Layer
-                            auto nextNode = nextLayer->getNeuron(nextN);
-                            // use n as index in next layer's node's inWeights
-                            error += (nextNode->getWeight(n))*(nextNode->getError());
-                        }
-                        error *= dsig(node->getInJ());
-//                        cout << "In Error: "<<error<<endl;
-                        node->setError(error);
+                    for(int nextN = 0; nextN < nextLayer->getNumNeurons(); nextN++) { // Each node in NEXT Layer
+                        auto nextNode = nextLayer->getNeuron(nextN);
+                        // use n as index in next layer's node's inWeights
+                        error += (nextNode->getWeight(n))*(nextNode->getError());
+                    }
+                    error *= dsig(node->getInJ());
+                    node->setError(error);
+                }
+            }
 
-                    // Update Weights coming into this node. Remember to update bias weight TOO.
+            /// Update the Weights
+            // Output Layer
+            // outputLayer = this->getLayer(2); // Already set from before
+            auto prevLayer = this->getLayer(1);
+            for(int on = 0; on < outputLayer->getNumNeurons(); on++) { // Each Output Node
+                auto outNode = outputLayer->getNeuron(on);
+
+                // Bias Update
+                double newBiasW = outNode->getBiasWeight() + (learningRate*(-1.000)*(outNode->getError()));
+                outNode->setBiasWeight(newBiasW);
+                // Update InWeights from Nodes (Prev Layer) -> This NODE
+                double newW;
+                for(int prevN = 0; prevN < prevLayer->getNumNeurons(); prevN++) {
+                    auto prevNode = prevLayer->getNeuron(prevN);
+                    newW = outNode->getWeight(prevN) + (learningRate*(prevNode->getOutput())*(outNode->getError()));
+                    outNode->setInWeight(newW,prevN);
+                }
+            }
+
+            // Other Layers (From l = L-1 to layer[1] (1st hidden layer)) [Don't need to compute error/weights for input layer]
+            for(int l = 1; l > 0; l--) {
+                auto layer = this->getLayer(l);
+                auto prevLayer = this->getLayer(l - 1);
+
+                for(int n = 0; n < layer->getNumNeurons(); n++) { // Each node in Layer
+                    auto node = layer->getNeuron(n);
+
                     // Bias Weight
-                    double newBiasW = node->getBiasWeight() + (learningRate*(-1)*error);
+                    double newBiasW = node->getBiasWeight() + (learningRate*(-1.000)*(node->getError()));
                     node->setBiasWeight(newBiasW);
                     // Update InWeights from Nodes (Prev Layer) -> This NODE
                     double newW;
                     for(int prevN = 0; prevN < prevLayer->getNumNeurons(); prevN++) {
                         auto prevNode = prevLayer->getNeuron(prevN);
-                        newW = node->getWeight(prevN) + (learningRate*(prevNode->getOutput())*error);
+                        newW = node->getWeight(prevN) + (learningRate*(prevNode->getOutput())*(node->getError()));
                         node->setInWeight(newW,prevN);
                     }
                 }
             }
-
-            // Training Example Done. Clear the in/out vectors for next example & free up memory
-            inputs.clear();
-            outputs.clear();
-        }
-    }
+        } // Each Training Example FOR
+    } // Each Epoch FOR
 }
 
 void net::saveNetwork(ofstream &saveFile) {
